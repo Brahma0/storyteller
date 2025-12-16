@@ -1,0 +1,13 @@
+---
+alwaysApply: true
+---
+# storyteller 项目规则（依文档为准）
+
+- 请优先参考并遵循项目内的规范文档：
+  - docs/standards/engineering-standards.md
+  - core/README.md
+  - ui/README.md
+  - models/README.md
+  - 其他目录若有 README，请一并遵循其说明。
+
+- 开发/修改代码前，请先查阅上述文档确定命名、注释、日志、架构和外部调用的约定；如有新增目录或子系统，请补充相应 README 并更新规范文档。
