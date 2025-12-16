@@ -1,0 +1,13 @@
+# 本项目推荐使用 uv 管理依赖与虚拟环境：
+#   uv sync
+# 如需使用传统 pip，可临时从 pyproject.toml 生成锁定文件，或手动对照安装。
+
+pyside6>=6.7,<7.0
+pyyaml>=6.0,<7.0
+python-dotenv>=1.0,<2.0
+langgraph>=0.2,<0.3
+playwright>=1.48,<2.0
+ffmpeg-python>=0.2,<0.3
+httpx>=0.27,<0.28
+structlog>=24.0,<25.0
+psutil>=6.0,<7.0

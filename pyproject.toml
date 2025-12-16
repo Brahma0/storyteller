@@ -1,0 +1,31 @@
+[project]
+name = "cyber-pingshu-workstation"
+version = "0.1.0"
+description = "Desktop cyber-pingshu automation workstation (PySide6 + LangGraph + Playwright)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+
+# 依赖尽量选择稳定的最新大版本，使用兼容范围约束（^ 表示同一主版本内最新）
+dependencies = [
+  "pyside6>=6.7,<7.0",          # Qt for Python GUI
+  "pyyaml>=6.0,<7.0",           # YAML 配置
+  "python-dotenv>=1.0,<2.0",    # 环境变量加载
+  "langgraph>=0.2,<0.3",        # 工作流编排
+  "playwright>=1.48,<2.0",      # 浏览器自动化
+  "ffmpeg-python>=0.2,<0.3",    # FFmpeg Python 封装
+  "httpx>=0.27,<0.28",          # HTTP 客户端
+  "structlog>=24.0,<25.0",      # 结构化日志
+  "psutil>=6.0,<7.0",           # 系统资源监控
+]
+
+[project.optional-dependencies]
+# 按功能拆分可选依赖，方便后续扩展
+voice = [
+  "openai>=1.40,<2.0",          # TTS / Whisper API 等（通过 OpenAI/兼容端点）
+  "elevenlabs>=1.0,<2.0",       # 高质量 TTS（可选）
+]
+
+[tool.uv]
+# 指定 uv 使用的 Python 版本范围
+python = ">=3.10"

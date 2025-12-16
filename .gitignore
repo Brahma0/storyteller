@@ -1,0 +1,27 @@
+# Python / env
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+
+# IDE / tooling
+.idea/
+.vscode/
+.DS_Store
+.cursor/
+
+# Build / cache / logs
+.pytest_cache/
+logs/
+output/
+checkpoints/
+
+# Playwright / browsers
+playwright/.cache/
+
+# Node / misc
+node_modules/
+.env
+__pycache__/
+*.pyc

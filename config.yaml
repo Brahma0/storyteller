@@ -1,0 +1,44 @@
+# 顶层配置示例（与设计文档 v2.1 保持一致，简化版）
+
+api:
+  openrouter:
+    api_key: ${OPENROUTER_API_KEY}
+    base_url: https://openrouter.ai/api/v1
+    models:
+      text_primary: gpt-4.1
+      text_cost_saver: gpt-4.1-mini
+      text_alt: claude-3.7-sonnet
+      text_backup: phi-4
+      moderation: null
+      embedding: null
+
+  images:
+    primary: openai-images
+    secondary: stability-sdxl
+    flux: replicate-flux
+
+  tts:
+    primary: elevenlabs
+    secondary: openai-tts
+
+  asr:
+    primary: openai-whisper
+    secondary: deepgram
+
+paths:
+  assets: ./assets
+  output: ./output
+  db: ./db/studio.db
+  logs: ./logs
+  checkpoints: ./checkpoints
+  models: ./models
+
+video:
+  resolution: "1080x1920"
+  fps: 60
+  codec: "h264"
+  bitrate: "8M"
+
+logging:
+  level: INFO
+  format: json
