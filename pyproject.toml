@@ -26,6 +26,13 @@ voice = [
   "elevenlabs>=1.0,<2.0",       # 高质量 TTS（可选）
 ]
 
+[dependency-groups]
+# 供 uv 使用的依赖分组；与上面的可选依赖保持一致，便于通过 `uv sync --group voice` 安装
+voice = [
+  "openai>=1.40,<2.0",
+  "elevenlabs>=1.0,<2.0",
+]
+
 [tool.uv]
 # 指定 uv 使用的 Python 版本范围
 python = ">=3.10"

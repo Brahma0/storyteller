@@ -154,6 +154,12 @@ voice = [
     { name = "openai" },
 ]
 
+[package.dev-dependencies]
+voice = [
+    { name = "elevenlabs" },
+    { name = "openai" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "elevenlabs", marker = "extra == 'voice'", specifier = ">=1.0,<2.0" },
@@ -169,6 +175,12 @@ requires-dist = [
     { name = "structlog", specifier = ">=24.0,<25.0" },
 ]
 provides-extras = ["voice"]
+
+[package.metadata.requires-dev]
+voice = [
+    { name = "elevenlabs", specifier = ">=1.0,<2.0" },
+    { name = "openai", specifier = ">=1.40,<2.0" },
+]
 
 [[package]]
 name = "distro"

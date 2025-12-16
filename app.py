@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QApplication
 from dotenv import load_dotenv
 
 from core.config import load_config
+from core.database import Database
 from core.logging_setup import setup_logging
 from ui.main_window import MainWindow
 
@@ -20,8 +21,12 @@ def main() -> None:
     config = load_config(BASE_DIR / "config.yaml")
     setup_logging(config)
 
+    # 初始化数据库与基础表结构
+    db = Database(config.paths.db)
+    db.init_schema()
+
     app = QApplication(sys.argv)
-    window = MainWindow(config=config)
+    window = MainWindow(config=config, db=db)
     window.show()
 
     sys.exit(app.exec())
