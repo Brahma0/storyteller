@@ -35,4 +35,4 @@ voice = [
 
 [tool.uv]
 # 指定 uv 使用的 Python 版本范围
-python = ">=3.10"
+required-version = ">=0.9.0"
