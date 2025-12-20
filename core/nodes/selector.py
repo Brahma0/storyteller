@@ -47,6 +47,40 @@ def run_selector(db: Database, limit: int = 20) -> List[Dict]:
             }
         )
 
+    # Prefer military/war related headlines for selector.
+    keywords = [
+        "军事",
+        "战争",
+        "国防",
+        "军队",
+        "武器",
+        "冲突",
+        "演习",
+        "导弹",
+        "海军",
+        "空军",
+        "陆军",
+        "战斗",
+        "国际",
+        "conflict",
+        "military",
+        "war",
+    ]
+
+    def matches_military(title: str) -> bool:
+        t = (title or "").lower()
+        for kw in keywords:
+            if kw.lower() in t:
+                return True
+        return False
+
+    filtered = [c for c in candidates if matches_military(c["title"])]
+    if filtered:
+        logger.info("selector_done_filtered", candidates_count=len(filtered))
+        return filtered
+
+    # If no military-related candidates found, return original list but log a warning.
+    logger.warning("selector_no_military_match", candidates_count=len(candidates))
     logger.info("selector_done", candidates_count=len(candidates))
     return candidates
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from queue import Queue, Empty
 
 from core.config import AppConfig
 from core.database import Database
@@ -68,7 +69,10 @@ class MainWindow(QMainWindow):
         self.preview_placeholder = QLabel("预览区域")
         self.preview_placeholder.setAlignment(Qt.AlignCenter)
         right_panel.addWidget(lbl_preview)
-        right_panel.addWidget(self.preview_placeholder, 1)
+        # Replace placeholder with a read-only text area to show script/content/status
+        self.preview_text = QTextEdit()
+        self.preview_text.setReadOnly(True)
+        right_panel.addWidget(self.preview_text, 1)
         # 预览 / 打开产出目录 按钮
         self.btn_open_output = QPushButton("打开产出目录")
         self.btn_play_video = QPushButton("播放产出视频")
@@ -84,6 +88,14 @@ class MainWindow(QMainWindow):
         self.btn_start.clicked.connect(self._on_start_clicked)  # type: ignore[arg-type]
         self.btn_open_output.clicked.connect(self._on_open_output)  # type: ignore[arg-type]
         self.btn_play_video.clicked.connect(self._on_play_video)  # type: ignore[arg-type]
+
+        # Thread-safe log queue to receive logs from background worker threads.
+        self._log_queue: "Queue[str]" = Queue()
+        # Timer to drain the queue and append logs in the main (GUI) thread.
+        self._log_timer = QTimer(self)
+        self._log_timer.setInterval(200)  # ms
+        self._log_timer.timeout.connect(self._drain_log_queue)  # type: ignore[arg-type]
+        self._log_timer.start()
 
     # --- slots -------------------------------------------------------------
 
@@ -143,6 +155,8 @@ class MainWindow(QMainWindow):
             # 默认选中第一条，提升体验
             if self.topic_list.count() > 0:
                 self.topic_list.setCurrentRow(0)
+                # load preview for the selected topic
+                self._load_topic_preview(self.topic_list.currentItem())
         else:
             # 回退：仍提供占位示例，方便在未接入爬虫前体验 UI
             for idx in range(1, 6):
@@ -163,7 +177,44 @@ class MainWindow(QMainWindow):
             self._append_log(f"开始处理示例选题：{topic}")
         # 触发后端任务（在单独线程中运行，不阻塞 UI）
         if topic_id is not None:
-            run_task_in_thread(topic_id, self._db, self._config, log_cb=self._append_log)
+            # Pass a thread-safe logger that enqueues messages for the GUI thread to display.
+            run_task_in_thread(topic_id, self._db, self._config, log_cb=lambda msg: self._log_queue.put(msg))
+
+    def _load_topic_preview(self, item: QListWidgetItem | None) -> None:
+        """Load latest production/script for the selected topic and display in preview_text."""
+        if item is None:
+            self.preview_text.clear()
+            return
+        topic_id = item.data(Qt.UserRole)
+        if topic_id is None:
+            self.preview_text.setPlainText(item.text())
+            return
+        try:
+            rows = list(
+                self._db.query(
+                    "SELECT script_content, audio_path, video_path, status, created_at FROM productions WHERE topic_id = ? ORDER BY created_at DESC LIMIT 1",
+                    (topic_id,),
+                )
+            )
+        except Exception as exc:
+            self._append_log(f"读取产出信息失败：{exc}")
+            return
+
+        if not rows:
+            self.preview_text.setPlainText("该选题尚无生成记录。")
+            return
+
+        r = rows[0]
+        parts = [
+            f"状态: {r['status']}",
+            f"创建时间: {r['created_at']}",
+            f"音频路径: {r['audio_path'] or 'N/A'}",
+            f"视频路径: {r['video_path'] or 'N/A'}",
+            "",
+            "===== 脚本预览（前1k字符） =====",
+            (r['script_content'] or "")[:1000],
+        ]
+        self.preview_text.setPlainText("\n".join(parts))
 
     def _on_open_output(self) -> None:
         """打开所选选题的产出目录（若有）。"""
@@ -240,3 +291,16 @@ class MainWindow(QMainWindow):
 
     def _append_log(self, text: str) -> None:
         self.log_view.append(text)
+
+    def _drain_log_queue(self) -> None:
+        """Drain queued log messages from background threads and append to the log view."""
+        try:
+            while True:
+                msg = self._log_queue.get_nowait()
+                # Ensure string
+                try:
+                    self.log_view.append(str(msg))
+                except Exception:
+                    self.log_view.append(repr(msg))
+        except Empty:
+            pass

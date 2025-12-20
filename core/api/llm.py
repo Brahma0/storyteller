@@ -49,7 +49,7 @@ class OpenRouterLLMClient:
             raise APIError("Unexpected OpenRouter response format") from exc
 
 
-def generate_ping_shu_script(client: OpenRouterLLMClient, topic: str, word_count: int = 900) -> str:
+def generate_ping_shu_script(client: OpenRouterLLMClient, topic: str, word_count: int = 900, mvp_shorten: bool = True) -> str:
     """Generate a ping-shu (评书) style script for the given topic using the provided LLM client.
 
     - `client` is an instance of `OpenRouterLLMClient`.
@@ -74,8 +74,13 @@ def generate_ping_shu_script(client: OpenRouterLLMClient, topic: str, word_count
         "术语转译表（示例）：服务器→藏经阁；Bug→走火入魔；程序员→符文师；数据库→天书库；算法→心法；代码→符咒；调试→调息；部署→出关。\n"
     )
 
+    # For MVP we shorten the output to speed up verification.
+    target_words = word_count
+    if mvp_shorten:
+        target_words = max(200, word_count // 2)
+
     constraints = (
-        f"字数目标：约 {word_count} 字，语言风格：赛博水墨风 + 霓虹点缀，避免使用具体真实个人或声纹模仿，注意合规与去敏感化。"
+        f"字数目标：约 {target_words} 字（MVP 缩短），语言风格：赛博水墨风 + 霓虹点缀，避免使用具体真实个人或声纹模仿，注意合规与去敏感化。"
     )
 
     prompt = (
@@ -89,5 +94,7 @@ def generate_ping_shu_script(client: OpenRouterLLMClient, topic: str, word_count
 
     # Use the client's chat endpoint
     # Set model to default; allow temperature and max_tokens to be tuned if needed
-    response = client.chat(prompt, model=None, temperature=0.7, max_tokens=4000)
+    # Convert target words to a loose token limit for max_tokens (approx factor 1.5)
+    approx_max_tokens = min(4000, int(target_words * 1.5))
+    response = client.chat(prompt, model=None, temperature=0.7, max_tokens=approx_max_tokens)
     return response

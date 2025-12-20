@@ -36,6 +36,45 @@ def _choose_background_asset(assets_dir: Path) -> Optional[Path]:
     return None
 
 
+def _get_media_duration(path: Path) -> Optional[float]:
+    """Return media duration in seconds using ffprobe, or None on failure."""
+    try:
+        cmd = [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(path),
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=15)
+        if res.returncode != 0:
+            # fallback: try format probe without selecting stream
+            cmd2 = [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(path),
+            ]
+            res = subprocess.run(cmd2, capture_output=True, text=True, check=False, timeout=15)
+            if res.returncode != 0:
+                return None
+        out = res.stdout.strip()
+        if not out:
+            return None
+        return float(out.splitlines()[0])
+    except Exception:
+        return None
+
+
 def render_node(state: AgentState, config: AppConfig) -> AgentState:
     """Combine state.audio_path with a background asset to produce a final video.
 
@@ -77,15 +116,40 @@ def render_node(state: AgentState, config: AppConfig) -> AgentState:
 
     bitrate = getattr(config.video, "bitrate", "8M") or "8M"
 
+    # Determine loop count to cover audio duration
+    audio_dur = _get_media_duration(audio_path)
+    bg_dur = _get_media_duration(bg)
+    loop_arg = None
+    if audio_dur and bg_dur and bg_dur > 0:
+        import math
+
+        loops_needed = math.ceil(audio_dur / bg_dur)
+        # ffmpeg -stream_loop takes count of additional loops (-1 means infinite)
+        loop_count = max(1, loops_needed)
+        # we'll set stream_loop to loop_count-1 (0 means play once)
+        loop_arg = str(loop_count - 1)
+        logger.info("render_durations", audio_duration=audio_dur, bg_duration=bg_dur, loops_needed=loops_needed)
+    else:
+        # Fallback to single background play (shortest will cut to audio)
+        loop_arg = "0"
+        logger.info("render_durations_unknown", audio_duration=audio_dur, bg_duration=bg_dur)
+
     cmd = [
         ffmpeg_path,
         "-y",
-        "-stream_loop",
-        "-1",
+    ]
+    if loop_arg != "0":
+        cmd += ["-stream_loop", loop_arg]
+    cmd += [
         "-i",
         str(bg),
         "-i",
         str(audio_path),
+        # ensure we map video from background and audio from the synthesized audio file
+        "-map",
+        "0:v",
+        "-map",
+        "1:a",
         "-c:v",
         "libx264",
         "-preset",
@@ -102,7 +166,8 @@ def render_node(state: AgentState, config: AppConfig) -> AgentState:
 
     logger.info("render_start", cmd=" ".join(cmd[:6]) + " ...", output=str(output_path))
     try:
-        res = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=600)
+        # increase timeout to allow longer ffmpeg runs if needed
+        res = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=900)
     except Exception as exc:  # pragma: no cover - external runtime
         state.error_message = f"ffmpeg_exception:{exc}"
         state.status = "failed"

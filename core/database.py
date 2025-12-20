@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 from typing import Iterator
+import threading
 
 
 class Database:
@@ -11,7 +12,10 @@ class Database:
     def __init__(self, path: Path) -> None:
         self._path = path
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(self._path)
+        # Allow connections to be used across threads; serialize access with a lock.
+        # Note: sqlite3 connections are not fully thread-safe, so we guard execute/query with a lock.
+        self._conn = sqlite3.connect(self._path, check_same_thread=False)
+        self._lock = threading.Lock()
         self._conn.row_factory = sqlite3.Row
 
     @property
@@ -19,9 +23,10 @@ class Database:
         return self._conn
 
     def init_schema(self) -> None:
-        cur = self._conn.cursor()
         # 这里只初始化关键表，字段结构与设计文档保持一致，可后续扩展
-        cur.executescript(
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.executescript(
             """
             CREATE TABLE IF NOT EXISTS topics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,18 +104,22 @@ class Database:
             );
             """
         )
-        self._conn.commit()
+            self._conn.commit()
 
     def execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
-        cur = self._conn.cursor()
-        cur.execute(sql, params)
-        self._conn.commit()
-        return cur
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute(sql, params)
+            self._conn.commit()
+            return cur
 
     def query(self, sql: str, params: tuple = ()) -> Iterator[sqlite3.Row]:
-        cur = self._conn.cursor()
-        cur.execute(sql, params)
-        yield from cur.fetchall()
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+        # yield outside lock
+        yield from rows
 
     def close(self) -> None:
         self._conn.close()

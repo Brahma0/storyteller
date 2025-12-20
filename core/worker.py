@@ -77,6 +77,9 @@ def run_task(topic_id: int, db: Database, config: AppConfig, log_cb: LogCallback
         state.script = script
         if log_cb:
             log_cb("脚本生成完成，正在保存到 productions 表。")
+            # Log a short preview of the script for UI visibility
+            preview = script[:1000].replace("\n", " ")
+            log_cb(f"--- script preview start ---\n{preview}\n--- script preview end ---")
         # persist production draft
         cur = db.execute(
             """
@@ -86,6 +89,8 @@ def run_task(topic_id: int, db: Database, config: AppConfig, log_cb: LogCallback
             (topic_id, task_id, script),
         )
         production_id = cur.lastrowid
+        if log_cb:
+            log_cb(f"已创建 production id={production_id}")
         _update_task_row(db, task_id, current_node="writer", progress=30.0)
 
         # TTS
@@ -99,6 +104,8 @@ def run_task(topic_id: int, db: Database, config: AppConfig, log_cb: LogCallback
         # update production audio_path
         db.execute("UPDATE productions SET audio_path = ? WHERE id = ?", (str(audio_path), production_id))
         state.audio_path = str(audio_path)
+        if log_cb:
+            log_cb(f"TTS 完成，生成音频：{audio_path}")
         _update_task_row(db, task_id, current_node="tts", progress=60.0)
         if log_cb:
             log_cb(f"TTS 完成：{audio_path}")
@@ -111,6 +118,8 @@ def run_task(topic_id: int, db: Database, config: AppConfig, log_cb: LogCallback
             raise RuntimeError(state.error_message or "render_failed")
         # update production video_path and mark completed
         db.execute("UPDATE productions SET video_path = ?, status = 'completed' WHERE id = ?", (state.video_path, production_id))
+        if log_cb:
+            log_cb(f"渲染完成，视频路径：{state.video_path}")
         _update_task_row(db, task_id, current_node="render", progress=95.0)
         if log_cb:
             log_cb(f"渲染完成：{state.video_path}")
